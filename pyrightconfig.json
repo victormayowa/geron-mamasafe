@@ -1,0 +1,29 @@
+{
+    "include": [
+        "backend"
+    ],
+    "exclude": [
+        "**/__pycache__",
+        "**/venv",
+        "**/.venv",
+        "**/node_modules"
+    ],
+    "executionEnvironments": [
+        {
+            "root": "backend",
+            "pythonVersion": "3.10",
+            "pythonPlatform": "Linux",
+            "extraPaths": [
+                "backend"
+            ]
+        }
+    ],
+    "typeCheckingMode": "basic",
+    "reportMissingImports": "warning",
+    "reportMissingTypeStubs": false,
+    "reportUnusedImport": "information",
+    "reportUnusedClass": "warning",
+    "reportUnusedFunction": "warning",
+    "reportUnusedVariable": "information",
+    "reportDuplicateImport": "warning"
+}
