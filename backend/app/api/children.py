@@ -134,3 +134,34 @@ async def assess_child_risk(
         "risk_description": risk_description,
         "recommendations": RiskStratificationService.get_risk_recommendations(risk_level, is_mother=False)
     }
+
+@router.get("/", response_model=dict)
+async def list_children(
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db)
+):
+    """List all children with pagination"""
+    
+    query = select(Child)
+    count_query = select(Child)
+    
+    count_result = await db.execute(count_query)
+    total = len(count_result.scalars().all())
+    
+    offset = (page - 1) * size
+    query = query.offset(offset).limit(size)
+    
+    result = await db.execute(query)
+    children = result.scalars().all()
+    
+    return {
+        "success": True,
+        "data": [ChildSchema.model_validate(c) for c in children],
+        "pagination": {
+            "total": total,
+            "page": page,
+            "size": size,
+            "pages": (total + size - 1) // size
+        }
+    }

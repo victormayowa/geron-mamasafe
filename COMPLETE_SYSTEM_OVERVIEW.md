@@ -65,7 +65,6 @@ A **world-class, production-ready** maternal, neonatal, child, and adolescent he
 💚 First trimester tip: Take your folic acid daily! 
 Eat leafy greens, beans, and citrus fruits. 
 Attend your antenatal appointments regularly.
-
 💚 Stay informed, stay healthy!
 Reply with any question for personalized advice
 ```

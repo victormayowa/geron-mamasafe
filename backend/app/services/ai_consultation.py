@@ -49,6 +49,7 @@ class AIConsultationService:
         query: str,
         patient_type: str = "mother",
         patient_profile: Optional[Dict] = None,
+        language: str = "english"
     ) -> Dict:
         """
         Process a health-related query and return intelligent response
@@ -66,7 +67,10 @@ class AIConsultationService:
         danger_sign_match = self._check_danger_signs(query, patient_type)
 
         if danger_sign_match:
-            return self._format_danger_sign_response(danger_sign_match, patient_profile)
+            response_dict = self._format_danger_sign_response(danger_sign_match, patient_profile)
+            if language.lower() != "english":
+                response_dict["response"] = await self._translate_text(response_dict["response"], language)
+            return response_dict
 
         # Step 2: Categorize the query
         category = self._categorize_query(query)
@@ -74,12 +78,12 @@ class AIConsultationService:
         # Step 3: Generate response using FREE LLM
         if category in ["danger_signs", "symptoms", "emergency"]:
             response = await self._generate_medical_response(
-                query, patient_type, patient_profile
+                query, patient_type, patient_profile, language
             )
             triage = self._assess_triage(query, response)
         else:
             response = await self._generate_general_response(
-                query, patient_type, patient_profile
+                query, patient_type, patient_profile, language
             )
             triage = TriageSeverity.GREEN
 
@@ -165,11 +169,11 @@ class AIConsultationService:
         }
 
     async def _generate_medical_response(
-        self, query: str, patient_type: str, patient_profile: Optional[Dict]
+        self, query: str, patient_type: str, patient_profile: Optional[Dict], language: str = "english"
     ) -> str:
         """Generate a medical response using FREE LLM"""
 
-        system_prompt = self._build_medical_system_prompt(patient_type, patient_profile)
+        system_prompt = self._build_medical_system_prompt(patient_type, patient_profile, language)
 
         # Try Groq first (Free tier, fast)
         if self.groq_client:
@@ -219,7 +223,7 @@ class AIConsultationService:
         return self._get_fallback_response(query)
 
     async def _generate_general_response(
-        self, query: str, patient_type: str, patient_profile: Optional[Dict]
+        self, query: str, patient_type: str, patient_profile: Optional[Dict], language: str = "english"
     ) -> str:
         """Generate a general health education response using FREE LLM"""
 
@@ -227,7 +231,8 @@ class AIConsultationService:
 Provide helpful, evidence-based health education information in a warm, supportive tone.
 Keep responses concise and easy to understand (WhatsApp-friendly).
 Patient type: {patient_type}
-Always encourage healthy practices and regular check-ups."""
+Always encourage healthy practices and regular check-ups.
+You must provide your final response entirely in the {language} language."""
 
         # Use same LLM priority: Groq > Ollama > HuggingFace
         if self.groq_client:
@@ -248,7 +253,7 @@ Always encourage healthy practices and regular check-ups."""
         return self._get_fallback_response(query)
 
     def _build_medical_system_prompt(
-        self, patient_type: str, patient_profile: Optional[Dict]
+        self, patient_type: str, patient_profile: Optional[Dict], language: str = "english"
     ) -> str:
         """Build system prompt for medical queries"""
 
@@ -277,7 +282,8 @@ RESPONSE FORMAT:
 - Give clear action steps
 - Specify where to go (facility level)
 - Provide home care tips if safe to do so
-- End with supportive message"""
+- End with supportive message
+- IMPORTANT: You MUST write your ENTIRE response in the {language} language."""
 
         if patient_profile:
             prompt += f"""
@@ -405,3 +411,25 @@ Stay healthy! 💚"""
     def _format_list(items: List[str]) -> str:
         """Format a list of items with bullet points"""
         return "\n".join(f"• {item}" for item in items)
+
+    async def _translate_text(self, text: str, target_language: str) -> str:
+        """Translate text to the target language using LLM"""
+        system_prompt = f"You are a professional medical translator. Translate the following text into {target_language}. Preserve all emojis and formatting exactly."
+        
+        # Try Groq first
+        if self.groq_client:
+            try:
+                response = await self.groq_client.chat.completions.create(
+                    model=settings.GROQ_MODEL,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": text},
+                    ],
+                    max_tokens=800,
+                    temperature=0.1,
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                logger.error(f"Translation failed: {e}")
+                
+        return text  # Fallback to original text if translation fails

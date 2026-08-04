@@ -61,6 +61,31 @@ services:
       - ./backend:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
+  # Celery Worker
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: geron_mamasafe_celery
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/geron_mamasafe
+      DATABASE_URL_SYNC: postgresql://postgres:postgres@postgres:5432/geron_mamasafe
+      REDIS_URL: redis://redis:6379/0
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
+      TWILIO_WHATSAPP_NUMBER: ${TWILIO_WHATSAPP_NUMBER}
+      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    volumes:
+      - ./backend:/app
+    command: celery -A app.core.celery_app.celery_app worker --loglevel=info
+
 volumes:
   postgres_data:
   redis_data:
